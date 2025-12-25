@@ -20,7 +20,7 @@ ADMIN_ID = os.getenv("ADMIN_ID")
 CHANNEL_ID = '@lazalex_prosto_psychology'
 CHANNEL_URL = "https://t.me/lazalex_prosto_psychology"
 IMAGE_URL = "https://raw.githubusercontent.com/Elektra174/meta-nav/main/logo.png"
-PDF_GUIDE_URL = "https://raw.githubusercontent.com/Elektra174/meta-nav/main/Svoboda_test.pdf"
+PDF_GUIDE_URL = "https://raw.githubusercontent.com/Elektra174/meta-nav/main/Test_Svoboda.pdf"
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -205,3 +205,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
