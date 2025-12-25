@@ -29,11 +29,9 @@ dp = Dispatcher(storage=MemoryStorage())
 class MPTSteps(StatesGroup):
     sphere = State(); problem = State(); goal = State(); control = State(); reality = State(); motivation = State()
 
-# УСИЛЕННЫЙ ФИЛЬТР ПРОТИВ АБРАКАДАБРЫ
 def is_meaningful(text):
     if not text: return False
     text = text.strip().lower()
-    # Минимум 10 символов, наличие гласных и отсутствие длинных цепочек согласных
     if len(text) < 10: return False 
     if not re.search(r'[аеёиоуыэюя]', text): return False
     if re.search(r'[бвгджзйклмнпрстфхцчшщ]{5,}', text): return False
@@ -158,11 +156,24 @@ async def ctrl(m: types.Message, state: FSMContext):
     try:
         val = int(''.join(filter(str.isdigit, m.text)))
         if val < 70:
-            return await m.answer(f"Сейчас фокус на внешних факторах ({val}%). В МПТ мы ищем, где выбор за вами. Попробуйте найти ту грань, где вы Автор.")
+            kb = types.InlineKeyboardMarkup(inline_keyboard=[
+                [types.InlineKeyboardButton(text="🔄 Попробовать еще раз", callback_data="audit")],
+                [types.InlineKeyboardButton(text="➡️ Всё равно продолжить", callback_data="skip_low_percent")]
+            ])
+            return await m.answer(
+                f"Похоже, сейчас фокус смещен на внешние факторы ({val}%). В МПТ мы ищем ту грань, где выбор остается за вами.\n\n"
+                "Хотите попробовать описать ситуацию иначе или продолжим как есть?", 
+                reply_markup=kb
+            )
         await state.update_data(c=val)
         await m.answer("Что нового обнаружится в вашем состоянии, когда вы вернёте себе роль Автора?")
         await state.set_state(MPTSteps.reality)
     except: await m.answer("Напишите число (например, 80).")
+
+@dp.callback_query(F.data == "skip_low_percent")
+async def skip_low(call: types.CallbackQuery, state: FSMContext):
+    await call.message.answer("Хорошо, идем дальше. Что нового обнаружится в вашем состоянии, когда вы вернёте себе роль Автора?")
+    await state.set_state(MPTSteps.reality)
 
 @dp.message(MPTSteps.reality)
 async def real(m: types.Message, state: FSMContext):
@@ -175,20 +186,17 @@ async def real(m: types.Message, state: FSMContext):
 async def final(m: types.Message, state: FSMContext):
     if not is_meaningful(m.text): return await m.answer("Поделитесь вашим истинным смыслом — почему это важно?")
     d = await state.get_data()
-    
-    # Отправка подробной заявки вам
     rep = (f"🚀 НОВАЯ ЗАЯВКА\n"
            f"Клиент: {m.from_user.full_name} (@{m.from_user.username})\n"
            f"Сфера: {d['sphere']}\n"
            f"Ситуация: {d['p']}\n"
-           f"Желаемое состояние: {d['g']}\n"
-           f"Субъектность: {d['c']}%\n"
+           f"Цель: {d['g']}\n"
+           f"Субъектность: {d.get('c', 'менее 70') or 'менее 70'}%\n"
            f"Новое восприятие: {d['r']}\n"
            f"Смысл/Почему важно: {m.text}")
     
     if ADMIN_ID: await bot.send_message(ADMIN_ID, rep)
     
-    # Финальное подтверждение для клиента
     final_text = (
         "✅ **Ваше исследование успешно завершено!**\n\n"
         "Благодарю за доверие. Я получил ваш запрос и внимательно изучу его.\n\n"
@@ -205,4 +213,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
