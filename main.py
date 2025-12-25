@@ -20,8 +20,9 @@ ADMIN_ID = os.getenv("ADMIN_ID")
 CHANNEL_ID = '@lazalex_prosto_psychology'
 CHANNEL_URL = "https://t.me/lazalex_prosto_psychology"
 IMAGE_URL = "https://raw.githubusercontent.com/Elektra174/meta-nav/main/logo.png"
-# Прямая RAW ссылка на файл
-PDF_GUIDE_URL = "https://raw.githubusercontent.com/Elektra174/meta-nav/main/Svoboda_guide.pdf"
+
+# ОБНОВЛЕННАЯ ССЫЛКА НА ФАЙЛ (прямая RAW ссылка)
+PDF_GUIDE_URL = "https://raw.githubusercontent.com/Elektra174/meta-nav/main/Svoboda_test.pdf"
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -33,24 +34,14 @@ class MPTSteps(StatesGroup):
 # --- СУПЕР-ФИЛЬТР СМЫСЛА ---
 def is_meaningful(text):
     if not text: return False
-    
-    # 1. Только кириллица
     if not re.search(r'[а-яА-Я]', text): return False
-    
-    # 2. Исключаем сообщения, состоящие только из знаков вопроса
     if text.strip() == "?" or (text.count('?') > 1 and len(text) < 10): return False
-    
-    # 3. Список "пустых" слов и отписок
     stop_words = {'привет', 'здравствуйте', 'тест', 'проверка', 'понятно', 'хорошо', 'нормально', 'окей', 'иди', 'нету', 'гладиолус', 'зачем', 'почему', 'хз', 'просто'}
-    
-    # 4. Считаем значимые уникальные слова
     words = re.findall(r'[а-яА-ЯёЁ]{2,}', text.lower())
     meaningful_words = {w for w in words if w not in stop_words}
-    
-    # ЛОГИКА: Минимум 3 уникальных слова И длина сообщения от 15 символов
+    # Минимум 3 уникальных слова И длина сообщения от 15 символов
     if len(meaningful_words) < 3 or len(text.strip()) < 15:
         return False
-    
     return True
 
 QUESTIONS = [
@@ -71,14 +62,14 @@ async def check_sub(user_id):
 async def give_gift(chat_id):
     welcome_back = (
         "Ваша подписка активна.\n\n"
-        "Привет! Меня зовут Александр Лазаренко, я психолог МПТ и автор проекта «Prosto психология | Метаформула жизни».\n\n"
+        "Привет! Меня зовут Александр Лазаренко, я психолог МПТ и автор проекта **«Prosto психология | Метаформула жизни»**.\n\n"
         "Я помогаю людям обрести роль Автора своей реальности и выйти из режима ожидания.\n\n"
         "🎁 Ваш подарок: полный тест «Свобода быть собой» в формате PDF (отправляю ниже).\n\n"
         "Также предлагаю пройти мини-квиз, чтобы определить ваш текущий уровень авторства."
     )
     kb_start = types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="🚀 Запустить мини-квиз", callback_data="t_0")]])
     try:
-        await bot.send_photo(chat_id, photo=IMAGE_URL, caption=welcome_back)
+        await bot.send_photo(chat_id, photo=IMAGE_URL, caption=welcome_back, parse_mode="Markdown")
         await bot.send_document(chat_id, document=PDF_GUIDE_URL, caption="Ваш подарок — Полный тест «Свобода быть собой» 🎁")
         await bot.send_message(chat_id, "Нажмите кнопку ниже, чтобы начать:", reply_markup=kb_start)
     except:
@@ -92,7 +83,7 @@ async def start(msg: types.Message, state: FSMContext):
         await give_gift(msg.chat.id)
     else:
         welcome_text = (
-            "Привет! Меня зовут Александр Лазаренко, я психолог МПТ и автор проекта «Prosto психология | Метаформула жизни».\n\n"
+            "Привет! Меня зовут Александр Лазаренко, я психолог МПТ и автор проекта **«Prosto психология | Метаформула жизни»**.\n\n"
             "Я помогаю людям обрести роль Автора своей реальности и выйти из режима ожидания.\n\n"
             "🎁 Ваш подарок готов: полный тест «Свобода быть собой» в формате PDF.\n\n"
             "Чтобы забрать подарок и начать путь, подпишитесь на мой канал."
@@ -102,9 +93,9 @@ async def start(msg: types.Message, state: FSMContext):
             [types.InlineKeyboardButton(text="✅ Я подписался", callback_data="recheck")]
         ])
         try:
-            await bot.send_photo(msg.chat.id, photo=IMAGE_URL, caption=welcome_text, reply_markup=kb_sub)
+            await bot.send_photo(msg.chat.id, photo=IMAGE_URL, caption=welcome_text, reply_markup=kb_sub, parse_mode="Markdown")
         except:
-            await msg.answer(welcome_text, reply_markup=kb_sub)
+            await msg.answer(welcome_text, reply_markup=kb_sub, parse_mode="Markdown")
 
 @dp.callback_query(F.data == "recheck")
 async def recheck(call: types.CallbackQuery, state: FSMContext):
