@@ -20,7 +20,7 @@ ADMIN_ID = os.getenv("ADMIN_ID")
 CHANNEL_ID = '@lazalex_prosto_psychology'
 CHANNEL_URL = "https://t.me/lazalex_prosto_psychology"
 IMAGE_URL = "https://raw.githubusercontent.com/Elektra174/meta-nav/main/logo.png"
-# Обновленное название файла
+# Прямая ссылка на ваш обновленный файл
 PDF_GUIDE_URL = "https://raw.githubusercontent.com/Elektra174/meta-nav/main/Test_Svoboda.pdf"
 
 logging.basicConfig(level=logging.INFO)
@@ -48,17 +48,18 @@ async def give_gift(chat_id):
         "Ваша подписка активна! 🌿\n\n"
         "Привет! Я Александр Лазаренко. Рад вашему интересу к теме Авторства и внутренней свободы.\n\n"
         "🎁 Как и обещал, отправляю вам **полный тест «Свобода быть собой»** в формате PDF.\n\n"
-        "Также предлагаю пройти здесь короткий интерактивный квиз, чтобы увидеть, насколько вы сейчас проявляетесь как Автор своей жизни."
+        "Также предлагаю пройти короткий квиз, чтобы увидеть, насколько вы сейчас проявляетесь как Автор своей жизни."
     )
+    # Короткая кнопка для мобильных устройств
     kb_start = types.InlineKeyboardMarkup(inline_keyboard=[[
-        types.InlineKeyboardButton(text="📝 Запустить квиз", callback_data="t_0")
+        types.InlineKeyboardButton(text="🚀 Начать квиз", callback_data="t_0")
     ]])
     try:
         await bot.send_photo(chat_id, photo=IMAGE_URL, caption=welcome_back, parse_mode="Markdown")
         await bot.send_document(chat_id, document=PDF_GUIDE_URL, caption="Ваш подарок 🎁")
         await bot.send_message(chat_id, "Начнем?", reply_markup=kb_start)
     except:
-        await bot.send_message(chat_id, "Запустить квиз?", reply_markup=kb_start)
+        await bot.send_message(chat_id, "Начать квиз?", reply_markup=kb_start)
 
 @dp.message(Command("start", "reset"))
 async def start(msg: types.Message, state: FSMContext):
@@ -68,7 +69,7 @@ async def start(msg: types.Message, state: FSMContext):
     else:
         text = (
             "Привет! Я Александр Лазаренко, психолог МПТ и автор проекта **«Prosto психология | Метаформула жизни»**.\n\n"
-            "Здесь мы исследуем, как перестать бороться с обстоятельствами и обнаружить право быть Автором своей жизни.\n\n"
+            "Здесь мы исследуем, как перестать бороться с обстоятельствами и обнаружить истинное право быть Автором своей жизни.\n\n"
             "🎁 Чтобы забрать подарок и запустить Навигатор, подпишитесь на мой канал."
         )
         kb = types.InlineKeyboardMarkup(inline_keyboard=[
@@ -102,14 +103,15 @@ async def run_test(call: types.CallbackQuery, state: FSMContext):
     await state.update_data(score=score)
 
     if step < len(questions):
+        # Компактные кнопки ответов
         kb = types.InlineKeyboardMarkup(inline_keyboard=[
             [types.InlineKeyboardButton(text="Никогда (0)", callback_data=f"t_{step+1}_0")],
             [types.InlineKeyboardButton(text="Иногда (2)", callback_data=f"t_{step+1}_2")],
-            [types.InlineKeyboardButton(text="Почти всегда (4)", callback_data=f"t_{step+1}_4")]
+            [types.InlineKeyboardButton(text="Всегда (4)", callback_data=f"t_{step+1}_4")]
         ])
         await call.message.answer(f"Вопрос {step+1} из {len(questions)}:\n\n{questions[step]}", reply_markup=kb)
     else:
-        # Развернутые описания результатов
+        # Категории результатов
         if score <= 6:
             res_name = "Автор"
             res_text = ("Поздравляю! Это состояние, когда вы ясно слышите себя и действуете из внутреннего выбора, "
@@ -199,6 +201,7 @@ async def final(m: types.Message, state: FSMContext):
     
     if ADMIN_ID: await bot.send_message(ADMIN_ID, rep)
     
+    # Текст финала
     final_text = (
         "Благодарю за доверие и ваше исследование.\n\n"
         "Осознание — это первый шаг, но само по себе знание редко меняет привычные паттерны. "
