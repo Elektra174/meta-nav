@@ -29,14 +29,21 @@ dp = Dispatcher(storage=MemoryStorage())
 class MPTSteps(StatesGroup):
     sphere = State(); problem = State(); goal = State(); control = State(); reality = State(); motivation = State()
 
+# УМНЫЙ ФИЛЬТР СМЫСЛА
 def is_meaningful(text):
     if not text: return False
-    clean_text = re.sub(r'[^а-яА-Яa-zA-Z]', '', text)
-    if len(clean_text) < 3: return False
-    if re.search(r'[^аеёиоуыэюяАЕЁИОУЫЭЮЯ]{5,}', clean_text): return False
-    if not re.search(r'[аеёиоуыэюяАЕЁИОУЫЭЮЯ]', clean_text): return False
-    if len(set(clean_text.lower())) < 3 and len(clean_text) > 5: return False
-    return True
+    # 1. Проверка на кириллицу (чтобы не писали на английском/абракадаброй)
+    if not re.search(r'[а-яА-Я]', text): return False
+    # 2. Убираем мусор, оставляем только слова
+    words = re.findall(r'[а-яА-ЯёЁ]{3,}', text.lower())
+    if not words: return False
+    # 3. Список "мусорных" сочетаний (согласные подряд)
+    bad_patterns = [r'[цкнгшщзхфвпрлджчсмтб]{5,}', r'[аеёиоуыэюя]{4,}']
+    for p in bad_patterns:
+        if re.search(p, text.lower()): return False
+    # 4. Проверка на реальность (минимум одно слово должно иметь гласные и быть похожим на человеческое)
+    meaningful_words = [w for w in words if re.search(r'[аеёиоуыэюя]', w)]
+    return len(meaningful_words) > 0
 
 QUESTIONS = [
     "Часто ловлю себя на мысли: «А что обо мне подумают?»",
@@ -54,6 +61,7 @@ async def check_sub(user_id):
     except: return False
 
 async def give_gift(chat_id):
+    # Текст для подписанных (БЕЗ "Рад видеть снова" и лишних символов)
     welcome_back = (
         "Ваша подписка активна.\n\n"
         "Привет! Меня зовут Александр Лазаренко, я психолог МПТ и автор проекта «Prosto психология | Метаформула жизни».\n\n"
@@ -68,7 +76,7 @@ async def give_gift(chat_id):
         await bot.send_document(chat_id, document=PDF_GUIDE_URL, caption="Ваш подарок — Полный тест «Свобода быть собой» 🎁")
         await bot.send_message(chat_id, "Нажмите кнопку ниже, чтобы начать:", reply_markup=kb_start)
     except:
-        await bot.send_message(chat_id, "Ваша подписка активна! Начинаем?", reply_markup=kb_start)
+        await bot.send_message(chat_id, "Начинаем?", reply_markup=kb_start)
 
 @dp.message(Command("start"))
 async def start(msg: types.Message, state: FSMContext):
@@ -78,6 +86,7 @@ async def start(msg: types.Message, state: FSMContext):
     if is_sub:
         await give_gift(msg.chat.id)
     else:
+        # Текст для неподписанных
         welcome_text = (
             "Привет! Меня зовут Александр Лазаренко, я психолог МПТ и автор проекта «Prosto психология | Метаформула жизни».\n\n"
             "Я помогаю людям обрести роль Автора своей реальности и выйти из режима ожидания.\n\n"
@@ -153,16 +162,16 @@ async def sphere_set(call: types.CallbackQuery, state: FSMContext):
 @dp.message(MPTSteps.problem)
 async def prob(m: types.Message, state: FSMContext):
     if not is_meaningful(m.text):
-        return await m.answer("Пожалуйста, опишите ситуацию подробнее, чтобы наш диалог был конструктивным.")
+        return await m.answer("Пожалуйста, опишите ситуацию более развернуто на русском языке.")
     await state.update_data(p=m.text)
     await m.answer("Какой результат вы хотите получить? Опишите это без частицы «НЕ», как конкретное событие или состояние.")
     await state.set_state(MPTSteps.goal)
 
 @dp.message(MPTSteps.goal)
 async def goal(m: types.Message, state: FSMContext):
-    if not is_meaningful(m.text): return await m.answer("Пожалуйста, опишите вашу цель словами.")
+    if not is_meaningful(m.text): return await m.answer("Опишите вашу цель понятно.")
     if "не " in m.text.lower():
-        return await m.answer("В МПТ мы идем к цели, а не убегаем от проблемы. Попробуйте сформулировать результат без «НЕ». К чему именно вы хотите прийти?")
+        return await m.answer("Попробуйте сформулировать результат без «НЕ». К чему именно вы хотите прийти?")
     await state.update_data(g=m.text)
     await m.answer("На сколько % этот результат зависит лично от вас?")
     await state.set_state(MPTSteps.control)
@@ -174,22 +183,22 @@ async def ctrl(m: types.Message, state: FSMContext):
         if not val_str: raise ValueError
         val = int(val_str)
         if val < 70:
-            return await m.answer(f"Когда ответственность составляет {val}%, управление остается в чужих руках. Попробуйте найти ту грань запроса, где вы будете отвечать за результат максимально.")
+            return await m.answer(f"Попробуйте найти ту грань запроса, где вы будете отвечать за результат максимально.")
         await state.update_data(c=val)
-    except: return await m.answer("Напишите, пожалуйста, число (например, 100).")
+    except: return await m.answer("Напишите числом (например, 100).")
     await m.answer("Что вы начнете делать иначе, когда почувствуете себя Автором в этой ситуации?")
     await state.set_state(MPTSteps.reality)
 
 @dp.message(MPTSteps.reality)
 async def real(m: types.Message, state: FSMContext):
-    if not is_meaningful(m.text): return await m.answer("Опишите ваши изменения чуть подробнее.")
+    if not is_meaningful(m.text): return await m.answer("Опишите ваши изменения подробнее.")
     await state.update_data(r=m.text)
     await m.answer("Почему для вас важно решить этот вопрос именно сейчас?")
     await state.set_state(MPTSteps.motivation)
 
 @dp.message(MPTSteps.motivation)
 async def final(m: types.Message, state: FSMContext):
-    if not is_meaningful(m.text): return await m.answer("Поделитесь вашим истинным смыслом — почему это важно?")
+    if not is_meaningful(m.text): return await m.answer("Поделитесь вашим смыслом — почему это важно?")
     d = await state.get_data()
     rep = (f"🔥 НОВАЯ ЗАЯВКА\n\n"
            f"Клиент: {m.from_user.full_name} (@{m.from_user.username})\n"
