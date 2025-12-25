@@ -29,10 +29,18 @@ dp = Dispatcher(storage=MemoryStorage())
 class MPTSteps(StatesGroup):
     sphere = State(); problem = State(); goal = State(); control = State(); reality = State(); motivation = State()
 
+# Усиленная проверка на осмысленность
 def is_meaningful(text):
-    if len(text) < 3: return False
-    if not re.search(r'[аеёиоуыэюяАЕЁИОУЫЭЮЯ]', text): return False
-    if len(set(text.lower())) < 3: return False
+    if not text: return False
+    # Убираем пробелы и знаки
+    clean_text = re.sub(r'[^а-яА-Яa-zA-Z]', '', text)
+    if len(clean_text) < 3: return False
+    # Проверка на "набор букв" (согласные подряд)
+    if re.search(r'[^аеёиоуыэюяАЕЁИОУЫЭЮЯ]{5,}', clean_text): return False
+    # Проверка на наличие гласных
+    if not re.search(r'[аеёиоуыэюяАЕЁИОУЫЭЮЯ]', clean_text): return False
+    # Проверка на повторяющиеся буквы (типа "ааааа")
+    if len(set(clean_text.lower())) < 3 and len(clean_text) > 5: return False
     return True
 
 QUESTIONS = [
@@ -50,51 +58,50 @@ async def check_sub(user_id):
         return m.status in ['member', 'administrator', 'creator']
     except: return False
 
+async def give_gift(chat_id):
+    gift_text = (
+        "✅ Рад видеть вас снова! Ваша подписка активна.\n\n"
+        "Ловите ваш подарок — **Гайд и полный тест «Свобода быть собой»** (файл ниже).\n\n"
+        "А теперь давайте определим ваш текущий уровень авторства. Это займет всего 1 минуту."
+    )
+    kb_start = types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="🚀 Запустить мини-квиз", callback_data="t_0")]])
+    try:
+        await bot.send_document(chat_id, document=PDF_GUIDE_URL, caption="Ваш подарок — Гайд и Тест «Свобода быть собой» 🎁")
+        await asyncio.sleep(1)
+        await bot.send_message(chat_id, gift_text, reply_markup=kb_start)
+    except:
+        await bot.send_message(chat_id, "Ваш подарок готов! Начните с теста, пока мы загружаем файл.", reply_markup=kb_start)
+
 @dp.message(Command("start"))
 async def start(msg: types.Message, state: FSMContext):
     await state.clear()
     is_sub = await check_sub(msg.from_user.id)
     
-    welcome_text = (
-        "Привет! Я Александр Лазаренко, психолог МПТ и автор проекта «Метаформула жизни».\n\n"
-        "Я помогаю вернуть себе роль Автора своей реальности и выйти из режима ожидания.\n\n"
-        "🎁 **Ваш подарок готов:** полный тест «Свобода быть собой» в формате PDF + экспресс-квиз на уровень авторства.\n\n"
-        "Чтобы забрать подарок и начать путь, подпишитесь на мой канал."
-    )
-    
-    kb_sub = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="📢 Подписаться и получить подарок", url=CHANNEL_URL)],
-        [types.InlineKeyboardButton(text="✅ Я подписался", callback_data="recheck")]
-    ])
-    
     if is_sub:
-        await give_gift(msg)
+        # Если уже подписан — сразу файл и тест
+        await give_gift(msg.chat.id)
     else:
+        # Если не подписан — стандартное приветствие
+        welcome_text = (
+            "Привет! Я Александр Лазаренко, психолог МПТ и автор проекта «Метаформула жизни».\n\n"
+            "Я помогаю вернуть себе роль Автора своей реальности и выйти из режима ожидания.\n\n"
+            "🎁 **Ваш подарок готов:** полный тест «Свобода быть собой» в формате PDF + экспресс-квиз на уровень авторства.\n\n"
+            "Чтобы забрать подарок и начать путь, подпишитесь на мой канал."
+        )
+        kb_sub = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(text="📢 Подписаться и получить подарок", url=CHANNEL_URL)],
+            [types.InlineKeyboardButton(text="✅ Я подписался", callback_data="recheck")]
+        ])
         try:
             await bot.send_photo(msg.chat.id, photo=IMAGE_URL, caption=welcome_text, reply_markup=kb_sub)
         except:
             await msg.answer(welcome_text, reply_markup=kb_sub)
 
-async def give_gift(msg):
-    gift_text = (
-        "✅ Подписка подтверждена!\n\n"
-        "Ловите ваш подарок — **Гайд и полный тест «Свобода быть собой»** (файл ниже).\n\n"
-        "А теперь давайте определим ваш текущий уровень авторства прямо здесь. Это займет всего 1 минуту."
-    )
-    kb_start = types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="🚀 Запустить мини-квиз", callback_data="t_0")]])
-    
-    try:
-        await bot.send_document(msg.chat.id, document=PDF_GUIDE_URL, caption="Ваш подарок — Гайд и Тест «Свобода быть собой» 🎁")
-        await asyncio.sleep(1)
-        await bot.send_message(msg.chat.id, gift_text, reply_markup=kb_start)
-    except:
-        await msg.answer(gift_text, reply_markup=kb_start)
-
 @dp.callback_query(F.data == "recheck")
 async def recheck(call: types.CallbackQuery, state: FSMContext):
     if await check_sub(call.from_user.id):
         await call.message.delete()
-        await give_gift(call.message)
+        await give_gift(call.message.chat.id)
     else:
         await call.answer("Нужна подписка на канал для получения подарка 🔄", show_alert=True)
 
@@ -103,7 +110,6 @@ async def run_test(call: types.CallbackQuery, state: FSMContext):
     step = int(call.data.split("_")[1])
     data = await state.get_data()
     score = data.get("score", 0)
-    
     if step > 0:
         score += int(call.data.split("_")[-1])
         await state.update_data(score=score)
@@ -151,14 +157,14 @@ async def sphere_set(call: types.CallbackQuery, state: FSMContext):
 @dp.message(MPTSteps.problem)
 async def prob(m: types.Message, state: FSMContext):
     if not is_meaningful(m.text):
-        return await m.answer("Пожалуйста, опишите ситуацию подробнее, чтобы наш диалог был конструктивным.")
+        return await m.answer("Пожалуйста, опишите ситуацию более развернуто, чтобы я мог подготовиться к нашей встрече.")
     await state.update_data(p=m.text)
     await m.answer("Какой результат вы хотите получить? Опишите это без частицы «НЕ», как конкретное событие или состояние.")
     await state.set_state(MPTSteps.goal)
 
 @dp.message(MPTSteps.goal)
 async def goal(m: types.Message, state: FSMContext):
-    if not is_meaningful(m.text): return await m.answer("Пожалуйста, опишите вашу цель словами.")
+    if not is_meaningful(m.text): return await m.answer("Опишите вашу цель словами.")
     if "не " in m.text.lower():
         return await m.answer("В МПТ мы идем к цели, а не убегаем от проблемы. Попробуйте сформулировать результат без «НЕ». К чему именно вы хотите прийти?")
     await state.update_data(g=m.text)
@@ -168,11 +174,13 @@ async def goal(m: types.Message, state: FSMContext):
 @dp.message(MPTSteps.control)
 async def ctrl(m: types.Message, state: FSMContext):
     try:
-        val = int(''.join(filter(str.isdigit, m.text)))
+        val_str = ''.join(filter(str.isdigit, m.text))
+        if not val_str: raise ValueError
+        val = int(val_str)
         if val < 70:
-            return await m.answer(f"Когда ответственность составляет {val}%, управление во многом остается в чужих руках. Попробуйте найти ту грань запроса, где вы будете отвечать за результат на 100%.")
+            return await m.answer(f"Когда ответственность составляет {val}%, управление остается в чужих руках. Попробуйте найти ту грань запроса, где вы будете отвечать за результат максимально.")
         await state.update_data(c=val)
-    except: return await m.answer("Напишите числом (например, 100).")
+    except: return await m.answer("Напишите, пожалуйста, число (например, 100).")
     await m.answer("Что вы начнете делать иначе, когда почувствуете себя Автором в этой ситуации?")
     await state.set_state(MPTSteps.reality)
 
@@ -185,7 +193,7 @@ async def real(m: types.Message, state: FSMContext):
 
 @dp.message(MPTSteps.motivation)
 async def final(m: types.Message, state: FSMContext):
-    if not is_meaningful(m.text): return await m.answer("Поделитесь вашим истинным смыслом — почему это действительно важно?")
+    if not is_meaningful(m.text): return await m.answer("Поделитесь вашим смыслом — почему это важно?")
     d = await state.get_data()
     rep = (f"🔥 НОВАЯ ЗАЯВКА\n\n"
            f"Клиент: {m.from_user.full_name} (@{m.from_user.username})\n"
